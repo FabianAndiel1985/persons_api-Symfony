@@ -21,7 +21,7 @@ class MainController extends AbstractController
         ]);
     }
 
-    #[Route('/add', name: 'add_person')]
+    #[Route('/add', name: 'add_person', methods: ['POST'])]
     public function add_person(Request $request, ManagerRegistry $doctrine ): JsonResponse
     {
         $entityManager = $doctrine->getManager();
