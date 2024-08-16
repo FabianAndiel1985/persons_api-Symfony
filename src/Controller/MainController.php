@@ -4,41 +4,89 @@ namespace App\Controller;
 
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\HttpFoundation\Request;
 use Doctrine\Persistence\ManagerRegistry;
+use App\Repository\PersonRepository;
 use App\Entity\Person;
+use Exception;
 
 class MainController extends AbstractController
 {
-    #[Route('/main', name: 'app_main')]
-    public function index(): JsonResponse
-    {
-        
-        return $this->json([
-            'message' => 'Welcome to your new controller!',
-            'path' => 'src/Controller/MainController.php',
-        ]);
-    }
-
+    
+  
     #[Route('/add', name: 'add_person', methods: ['POST'])]
     public function add_person(Request $request, ManagerRegistry $doctrine ): JsonResponse
     {
+      
         $entityManager = $doctrine->getManager();
         $content = $request->getContent();
         $content = json_decode($content, true);
         $person=$this->createPersonFromRequest($content);
         $entityManager->persist($person);
         $entityManager->flush();
- 
+        
         return $this->json([
-            'message' => 'Content given out '.$person->getFirstname(),
-            'path' => 'src/Controller/MainController.php',
+            'message' => 'Saved person in database: ',
+             'firstname' => $person->getFirstname(),
+             'lastname' => $person->getLastname(),
         ]);
     }
 
 
-    private function createPersonFromRequest($requestContent): Person {
+    #[Route('/update', name: 'update_person', methods: ['PUT'])]
+    public function update_person(Request $request, ManagerRegistry $doctrine, PersonRepository $personRepository ): JsonResponse
+    {
+        //get the request
+        $content = $request->getContent();
+        $content = json_decode($content, true);
+        //get the properties of the request
+        $contentKeys =  array_keys($content);
+
+        $id = $content["id"];
+        //Get the person from the db
+        $entityManager = $doctrine->getManager();
+        $person= $personRepository->findOneBySomeField($id);
+
+        $updatedProperties = array();
+
+        foreach ( $contentKeys as $key) {
+            if(property_exists($person,$key)) {
+                $setterName = 'set' . ucfirst($key);
+                if (method_exists($person, $setterName)) {
+                    call_user_func([$person, $setterName], $content[$key]);
+                    array_push($updatedProperties, $key);
+                }
+            }
+        }
+
+        $returnMessage = $this->createReturnString($updatedProperties);
+
+
+        $entityManager->persist($person);
+        $entityManager->flush();
+        
+        return $this->json([
+            'message' => $returnMessage,
+        ]);
+    }
+
+    
+    private function createReturnString(array $updatedElements):string{
+        if( count($updatedElements)>0) {
+            $updatedFields= implode(', ', $updatedElements);
+            $message = "The following values have been updated: ".$updatedFields;
+            return $message;
+        }
+        else {
+            return "No values have been updated";
+        }
+
+    }
+
+
+    private function createPersonFromRequest($requestContent){
         $person = new Person();
         $person->setFirstname($requestContent["firstname"]);
         $person->setLastname($requestContent["lastname"]);
@@ -46,9 +94,6 @@ class MainController extends AbstractController
         $person->setHousenumber($requestContent["housenumber"]);
         $person->setAppartment($requestContent["appartment"]);
         $person->setPhonenumber($requestContent["phonenumber"]);
-
         return $person;
     }
-
-
 }
