@@ -35,6 +35,22 @@ class MainController extends AbstractController
     }
 
 
+    #[Route('/get', name: 'get_person', methods: ['GET'])]
+    public function get_person(Request $request,PersonRepository $personRepository   ): JsonResponse
+    {
+        $content = $request->getContent();
+        $content = json_decode($content, true);
+        $id = $content["id"];
+        $person= $personRepository->findOneBySomeField($id);
+        
+
+        return $this->json([
+            'message' => 'The requested person ',
+            'person' => $person,
+        ]);
+    }
+
+
     #[Route('/update', name: 'update_person', methods: ['PUT'])]
     public function update_person(Request $request, ManagerRegistry $doctrine, PersonRepository $personRepository ): JsonResponse
     {
