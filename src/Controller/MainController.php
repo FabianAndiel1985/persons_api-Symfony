@@ -3,6 +3,10 @@
 namespace App\Controller;
 
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\Serializer\SerializerInterface;
+use Symfony\Component\Serializer\Serializer;
+use Symfony\Component\Serializer\Normalizer\ObjectNormalizer;
+use Symfony\Component\Serializer\Encoder\JsonEncoder;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -36,18 +40,22 @@ class MainController extends AbstractController
 
 
     #[Route('/get', name: 'get_person', methods: ['GET'])]
-    public function get_person(Request $request,PersonRepository $personRepository   ): JsonResponse
+    public function get_person(Request $request,PersonRepository $personRepository, SerializerInterface $serializer): JsonResponse
     {
+        $encoder = [new JsonEncoder()];
+        $normalizers = [new ObjectNormalizer()];
+
+        $serializer = new Serializer($normalizers, $encoder);
         $content = $request->getContent();
         $content = json_decode($content, true);
         $id = $content["id"];
         $person= $personRepository->findOneBySomeField($id);
-        
+        $jsonContent = $serializer->serialize($person, 'json');
 
-        return $this->json([
-            'message' => 'The requested person ',
-            'person' => $person,
-        ]);
+         return $this->json([
+             'message' => 'The requested person: ',
+             'person' => $jsonContent,
+         ]);
     }
 
 
