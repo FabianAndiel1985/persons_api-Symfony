@@ -59,6 +59,25 @@ class MainController extends AbstractController
     }
 
 
+    #[Route('/del', name: 'del_person', methods: ['DELETE'])]
+    public function del_person(Request $request, PersonRepository $personRepository, ManagerRegistry $doctrine): JsonResponse
+    {
+        $entityManager = $doctrine->getManager();
+        $content = $request->getContent();
+        $content = json_decode($content, true);
+        $id = $content["id"];
+        $person = $personRepository->findOneBySomeField($id);
+        $entityManager->remove($person);
+        // Flush the changes to the database
+        $entityManager->flush();
+
+         return $this->json([
+             'message' => 'Person ',
+             'person' => "returned ".$person->getFirstname(),
+         ]);
+    }
+
+
     #[Route('/update', name: 'update_person', methods: ['PUT'])]
     public function update_person(Request $request, ManagerRegistry $doctrine, PersonRepository $personRepository ): JsonResponse
     {
