@@ -18,18 +18,22 @@ use Exception;
 
 class MainController extends AbstractController
 {
+
+    public function __construct(PersonRepository $personRepository, ManagerRegistry $doctrine, SerializerInterface $serializer)
+    {
+        $this->entityManager = $doctrine->getManager();
+        $this->personRepository =  $personRepository;
+    }
     
   
     #[Route('/add', name: 'add_person', methods: ['POST'])]
-    public function add_person(Request $request, ManagerRegistry $doctrine ): JsonResponse
+    public function add_person(Request $request): JsonResponse
     {
       
-        $entityManager = $doctrine->getManager();
-        $content = $request->getContent();
-        $content = json_decode($content, true);
+        $content = $this->getRequestContent(true,$request);
         $person=$this->createPersonFromRequest($content);
-        $entityManager->persist($person);
-        $entityManager->flush();
+        $this->entityManager->persist($person);
+        $this->entityManager->flush();
         
         return $this->json([
             'message' => 'Saved person in database: ',
@@ -40,16 +44,15 @@ class MainController extends AbstractController
 
 
     #[Route('/get', name: 'get_person', methods: ['GET'])]
-    public function get_person(Request $request,PersonRepository $personRepository, SerializerInterface $serializer): JsonResponse
+    public function get_person(Request $request, SerializerInterface $serializer): JsonResponse
     {
         $encoder = [new JsonEncoder()];
         $normalizers = [new ObjectNormalizer()];
 
         $serializer = new Serializer($normalizers, $encoder);
-        $content = $request->getContent();
-        $content = json_decode($content, true);
+        $content = $this->getRequestContent(true,$request);
         $id = $content["id"];
-        $person= $personRepository->findOneBySomeField($id);
+        $person= $this->personRepository->findOneBySomeField($id);
         $jsonContent = $serializer->serialize($person, 'json');
 
          return $this->json([
@@ -60,37 +63,32 @@ class MainController extends AbstractController
 
 
     #[Route('/del', name: 'del_person', methods: ['DELETE'])]
-    public function del_person(Request $request, PersonRepository $personRepository, ManagerRegistry $doctrine): JsonResponse
+    public function del_person(Request $request): JsonResponse
     {
-        $entityManager = $doctrine->getManager();
-        $content = $request->getContent();
-        $content = json_decode($content, true);
+        $content = $this->getRequestContent(true,$request);
         $id = $content["id"];
-        $person = $personRepository->findOneBySomeField($id);
-        $entityManager->remove($person);
-        // Flush the changes to the database
-        $entityManager->flush();
+        $person = $this->personRepository->findOneBySomeField($id);
+        $this->entityManager->remove($person);
+        $this->entityManager->flush();
 
          return $this->json([
-             'message' => 'Person ',
-             'person' => "returned ".$person->getFirstname(),
+             'message' => 'Deleted the Person: ',
+             'person' => $person->getFirstname()." ".$person->getLastname(),
          ]);
     }
 
 
     #[Route('/update', name: 'update_person', methods: ['PUT'])]
-    public function update_person(Request $request, ManagerRegistry $doctrine, PersonRepository $personRepository ): JsonResponse
+    public function update_person(Request $request): JsonResponse
     {
         //get the request
-        $content = $request->getContent();
-        $content = json_decode($content, true);
+        $content = $this->getRequestContent(true, $request);
         //get the properties of the request
         $contentKeys =  array_keys($content);
 
         $id = $content["id"];
         //Get the person from the db
-        $entityManager = $doctrine->getManager();
-        $person= $personRepository->findOneBySomeField($id);
+        $person= $this->personRepository->findOneBySomeField($id);
 
         $updatedProperties = array();
 
@@ -106,13 +104,17 @@ class MainController extends AbstractController
 
         $returnMessage = $this->createReturnString($updatedProperties);
 
-
-        $entityManager->persist($person);
-        $entityManager->flush();
+        $this->entityManager->persist($person);
+        $this->entityManager->flush();
         
         return $this->json([
             'message' => $returnMessage,
         ]);
+    }
+
+    private function getRequestContent(bool $returnAsAssocArray, Request $request):array{
+        $content = $request->getContent();
+        return json_decode($content, $returnAsAssocArray);
     }
 
     
