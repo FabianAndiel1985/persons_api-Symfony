@@ -19,7 +19,7 @@ use Exception;
 class MainController extends AbstractController
 {
 
-    public function __construct(PersonRepository $personRepository, ManagerRegistry $doctrine, SerializerInterface $serializer)
+    public function __construct(PersonRepository $personRepository, ManagerRegistry $doctrine)
     {
         $this->entityManager = $doctrine->getManager();
         $this->personRepository =  $personRepository;
@@ -29,12 +29,34 @@ class MainController extends AbstractController
     #[Route('/add', name: 'add_person', methods: ['POST'])]
     public function add_person(Request $request): JsonResponse
     {
-      
+      try {
         $content = $this->getRequestContent(true,$request);
+        if(empty($content)) {
+            throw new \InvalidArgumentException("Json request body is empty");
+        }
         $person=$this->createPersonFromRequest($content);
         $this->entityManager->persist($person);
         $this->entityManager->flush();
-        
+      } catch (\InvalidArgumentException $e) {
+        return $this->json([
+             'error' => 'An argument error happened in the request ',
+             'message' => $e->getMessage(),
+        ],400);
+      }
+      catch (\Doctrine\ORM\ORMException $e){
+        return $this->json([
+            'error' => 'A database error occurred',
+            'message' => $e->getMessage(),
+        ], 500);
+      }
+      catch(\Exception $e) {
+        return $this->json([
+            'error' => 'An error occurred',
+            'message' => $e->getMessage(),
+        ], 500);
+      }
+
+
         return $this->json([
             'message' => 'Saved person in database: ',
              'firstname' => $person->getFirstname(),
@@ -46,14 +68,32 @@ class MainController extends AbstractController
     #[Route('/get', name: 'get_person', methods: ['GET'])]
     public function get_person(Request $request, SerializerInterface $serializer): JsonResponse
     {
+        try{
         $encoder = [new JsonEncoder()];
         $normalizers = [new ObjectNormalizer()];
-
         $serializer = new Serializer($normalizers, $encoder);
         $content = $this->getRequestContent(true,$request);
+        if(empty($content)) {
+            throw new \InvalidArgumentException("Id is missing in the request or request is empty");
+        }
         $id = $content["id"];
         $person= $this->personRepository->findOneBySomeField($id);
         $jsonContent = $serializer->serialize($person, 'json');
+        }
+
+        catch (\InvalidArgumentException $e) {
+            return $this->json([
+                 'error' => 'An argument error happened in the request ',
+                 'message' => $e->getMessage(),
+            ],400);
+          }
+
+        catch(\Exception $e) {
+            return $this->json([
+                'error' => 'An error occurred',
+                'message' => $e->getMessage(),
+            ], 500);
+          }
 
          return $this->json([
              'message' => 'The requested person: ',
