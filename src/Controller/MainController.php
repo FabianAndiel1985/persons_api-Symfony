@@ -15,6 +15,11 @@ use Doctrine\Persistence\ManagerRegistry;
 use App\Repository\PersonRepository;
 use App\Entity\Person;
 use Exception;
+use InvalidArgumentException;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Doctrine\ORM\NoResultException;
+
+
 
 class MainController extends AbstractController
 {
@@ -32,12 +37,12 @@ class MainController extends AbstractController
       try {
         $content = $this->getRequestContent(true,$request);
         if(empty($content)) {
-            throw new \InvalidArgumentException("Json request body is empty");
+            throw new InvalidArgumentException("Json request body is empty");
         }
         $person=$this->createPersonFromRequest($content);
         $this->entityManager->persist($person);
         $this->entityManager->flush();
-      } catch (\InvalidArgumentException $e) {
+      } catch (InvalidArgumentException $e) {
         return $this->json([
              'error' => 'An argument error happened in the request ',
              'message' => $e->getMessage(),
@@ -48,7 +53,8 @@ class MainController extends AbstractController
             'error' => 'A database error occurred',
             'message' => $e->getMessage(),
         ], 500);
-      }
+    }
+
       catch(\Exception $e) {
         return $this->json([
             'error' => 'An error occurred',
@@ -78,6 +84,9 @@ class MainController extends AbstractController
         }
         $id = $content["id"];
         $person= $this->personRepository->findOneBySomeField($id);
+        if(!$person ) {
+            throw new NoResultException();
+        }
         $jsonContent = $serializer->serialize($person, 'json');
         }
 
@@ -85,6 +94,13 @@ class MainController extends AbstractController
             return $this->json([
                  'error' => 'An argument error happened in the request ',
                  'message' => $e->getMessage(),
+            ],400);
+          }
+
+          catch (NoResultException $e) {
+            return $this->json([
+                 'error' => 'No result found',
+                 'message' => 'No person with the given id was found',
             ],400);
           }
 
@@ -105,11 +121,40 @@ class MainController extends AbstractController
     #[Route('/del', name: 'del_person', methods: ['DELETE'])]
     public function del_person(Request $request): JsonResponse
     {
-        $content = $this->getRequestContent(true,$request);
-        $id = $content["id"];
-        $person = $this->personRepository->findOneBySomeField($id);
-        $this->entityManager->remove($person);
-        $this->entityManager->flush();
+        try {
+            $content = $this->getRequestContent(true,$request);
+            if(empty($content)) {
+                throw new \InvalidArgumentException("Id is missing in the request or request is empty");
+            }
+            $id = $content["id"];
+            $person = $this->personRepository->findOneBySomeField($id);
+            if(!$person ) {
+                throw new NoResultException();
+            }
+            $this->entityManager->remove($person);
+            $this->entityManager->flush();
+        }
+
+        catch (NoResultException $e) {
+            return $this->json([
+                 'error' => 'No result found',
+                 'message' => 'No person with the given id was found',
+            ], 400);
+          }
+
+        catch (\InvalidArgumentException $e) {
+            return $this->json([
+                 'error' => 'An argument error happened in the request ',
+                 'message' => $e->getMessage(),
+            ], 400);
+          }
+
+        catch(\Exception $e) {
+            return $this->json([
+                'error' => 'An error occurred',
+                'message' => $e->getMessage(),
+            ], 500);
+          }
 
          return $this->json([
              'message' => 'Deleted the Person: ',
@@ -121,13 +166,12 @@ class MainController extends AbstractController
     #[Route('/update', name: 'update_person', methods: ['PUT'])]
     public function update_person(Request $request): JsonResponse
     {
-        //get the request
+
+       
         $content = $this->getRequestContent(true, $request);
-        //get the properties of the request
         $contentKeys =  array_keys($content);
 
         $id = $content["id"];
-        //Get the person from the db
         $person= $this->personRepository->findOneBySomeField($id);
 
         $updatedProperties = array();
