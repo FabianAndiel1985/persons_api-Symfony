@@ -37,7 +37,7 @@ class MainController extends AbstractController
       try {
         $content = $this->getRequestContent(true,$request);
         if(empty($content)) {
-            throw new InvalidArgumentException("Json request body is empty");
+            throw new InvalidArgumentException("The request is empty");
         }
         $person=$this->createPersonFromRequest($content);
         $this->entityManager->persist($person);
@@ -80,7 +80,7 @@ class MainController extends AbstractController
         $serializer = new Serializer($normalizers, $encoder);
         $content = $this->getRequestContent(true,$request);
         if(empty($content)) {
-            throw new \InvalidArgumentException("Id is missing in the request or request is empty");
+            throw new \InvalidArgumentException("The request is empty");
         }
         $id = $content["id"];
         $person= $this->personRepository->findOneBySomeField($id);
@@ -124,7 +124,7 @@ class MainController extends AbstractController
         try {
             $content = $this->getRequestContent(true,$request);
             if(empty($content)) {
-                throw new \InvalidArgumentException("Id is missing in the request or request is empty");
+                throw new \InvalidArgumentException("The request is empty");
             }
             $id = $content["id"];
             $person = $this->personRepository->findOneBySomeField($id);
@@ -166,31 +166,61 @@ class MainController extends AbstractController
     #[Route('/update', name: 'update_person', methods: ['PUT'])]
     public function update_person(Request $request): JsonResponse
     {
+        try{
+            $content = $this->getRequestContent(true, $request);
+            if(empty($content)) {
+                throw new \InvalidArgumentException("The request is empty");
+            }
 
-       
-        $content = $this->getRequestContent(true, $request);
-        $contentKeys =  array_keys($content);
+            $contentKeys =  array_keys($content);
 
-        $id = $content["id"];
-        $person= $this->personRepository->findOneBySomeField($id);
+            $id = $content["id"];
+            $person= $this->personRepository->findOneBySomeField($id);
+            if(!$person) {
+                throw new NoResultException();
+            }
 
-        $updatedProperties = array();
+            $updatedProperties = array();
 
-        foreach ( $contentKeys as $key) {
-            if(property_exists($person,$key)) {
-                $setterName = 'set' . ucfirst($key);
-                if (method_exists($person, $setterName)) {
-                    call_user_func([$person, $setterName], $content[$key]);
-                    array_push($updatedProperties, $key);
+            foreach ( $contentKeys as $key) {
+                if(property_exists($person,$ksey)) {
+                    $setterName = 'set' . ucfirst($key);
+                    if (method_exists($person, $setterName)) {
+                        call_user_func([$person, $setterName], $content[$key]);
+                        array_push($updatedProperties, $key);
+                    }
                 }
             }
+
+            $returnMessage = $this->createReturnString($updatedProperties);
+
+            $this->entityManager->persist($person);
+            $this->entityManager->flush();
+        
         }
 
-        $returnMessage = $this->createReturnString($updatedProperties);
+        catch (NoResultException $e) {
+            return $this->json([
+                 'error' => 'No result found',
+                 'message' => 'No person with the given id was found',
+            ], 400);
+          }
 
-        $this->entityManager->persist($person);
-        $this->entityManager->flush();
-        
+        catch (\InvalidArgumentException $e) {
+            return $this->json([
+                 'error' => 'An argument error happened in the request ',
+                 'message' => $e->getMessage(),
+            ], 400);
+          }
+
+        catch(\Exception $e) {
+            return $this->json([
+                'error' => 'An error occurred',
+                'message' => $e->getMessage(),
+            ], 500);
+          }
+
+
         return $this->json([
             'message' => $returnMessage,
         ]);
